@@ -1,0 +1,25 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isAdmin() { return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)); }
+
+    // بطاقة المستخدم (اسم + إيميل): صاحبها يكتبها، وصاحبها أو الأدمن يقراها
+    match /users/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow create, update: if signedIn() && request.auth.uid == uid;
+      allow delete: if false;
+
+      // بيانات التراكر نفسها: صاحبها بس — حتى الأدمن مش بيقدر يقراها
+      match /private/{doc} {
+        allow read, write: if signedIn() && request.auth.uid == uid;
+      }
+    }
+
+    // قايمة الأدمنز: تتعدّل من لوحة Firebase بس
+    match /admins/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow write: if false;
+    }
+  }
+}
